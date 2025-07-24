@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Meteorite Landings Map</title>
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+  body { margin: 0; font-family: Arial, sans-serif; }
+  #map { height: 100vh; }
+  /* Optional: style for info tooltip */
+  .leaflet-tooltip { font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+// Initialize the map
+const map = L.map('map').setView([20, 0], 2);
+
+// Add a tile layer
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+// Fetch meteorite data
+fetch('https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/meteorite-strike-data.json')
+  .then(res => res.json())
+  .then(data => {
+    // Filter out entries without valid coordinates
+    const meteorites = data.features.filter(feature => {
+      const coords = feature.geometry.coordinates;
+      return coords && coords.length === 2 && coords[0] && coords[1];
+    });
+
+    // Find max mass for scaling
+    const maxMass = Math.max(...meteorites.map(f => f.properties.mass));
+    const minMass = Math.min(...meteorites.map(f => f.properties.mass));
+
+    // Function to scale marker size
+    function getRadius(mass) {
+      // Normalize mass to a range for radius
+      const minRadius = 2;
+      const maxRadius = 20;
+      return ((mass - minMass) / (maxMass - minMass)) * (maxRadius - minRadius) + minRadius;
+    }
+
+    // Loop through meteorites and add circle markers
+    meteorites.forEach(feature => {
+      const coords = feature.geometry.coordinates;
+      const properties = feature.properties;
+      const mass = properties.mass ? +properties.mass : 0;
+
+      // Create circle marker
+      const circle = L.circleMarker([coords[1], coords[0]], {
+        radius: getRadius(mass),
+        fillColor: 'orange',
+        color: 'orange',
+        weight: 1,
+        fillOpacity: 0.7
+      });
+
+      // Add tooltip with info
+      const name = properties.name || 'Unknown';
+      const year = properties.year ? new Date(properties.year).getFullYear() : 'Unknown';
+      const recClass = properties.recclass || 'Unknown';
+      const massStr = properties.mass ? properties.mass + ' grams' : 'Unknown';
+
+      circle.bindTooltip(
+        `<strong>${name}</strong><br/>Year: ${year}<br/>Class: ${recClass}<br/>Mass: ${massStr}`,
+        { sticky: true }
+      );
+
+      circle.addTo(map);
+    });
+  })
+  .catch(err => console.error('Error loading data:', err));
+</script>
+</body>
+</html>
